@@ -1,0 +1,9 @@
+.atom
+.idea
+.vs
+.vscode
+
+/build
+/cmake-build-*
+
+.DS_Store
