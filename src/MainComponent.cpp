@@ -14,7 +14,7 @@ auto analyseFile(juce::File const& path) -> std::vector<LevelWindow>
     if (buffer.buffer.getNumSamples() == 0) return {};
     DBG("Load Finished");
 
-    auto const windowLength      = Milliseconds<float>{5000.0f};
+    auto const windowLength      = Milliseconds<float>{10000.0f};
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
     auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
 
@@ -77,12 +77,40 @@ auto rmsWindowsToPath(std::vector<ta::LevelWindow> const& windows, juce::Rectang
     return containerToPath(windows.size(), area, [&windows](std::size_t i) { return windows[i].rms; });
 }
 
+auto rmsAverageToPath(std::vector<float> const& averages, juce::Rectangle<int> area) -> juce::Path
+{
+    return containerToPath(averages.size(), area, [&averages](std::size_t i) { return averages[i]; });
+}
+
+template<typename ContainerAccess>
+auto average(std::size_t count, ContainerAccess access) -> float
+{
+    auto sum = 0.0f;
+    for (auto i{0U}; i < count; ++i) { sum += access(i); }
+    return sum / static_cast<float>(count);
+}
+
+template<typename ContainerAccess>
+auto rollingAverage(std::size_t count, float* out, ContainerAccess access) -> void
+{
+    for (auto i{0U}; i < count; ++i, ++out) { *out = average(i + 1, access); }
+}
+
+auto rollingAverage(std::vector<ta::LevelWindow> const& windows) -> std::vector<float>
+{
+    auto averages = std::vector<float>{};
+    averages.resize(windows.size());
+    rollingAverage(windows.size(), averages.data(), [&windows](std::size_t i) { return windows[i].rms; });
+    return averages;
+}
+
 MainComponent::MainComponent()
 {
     addAndMakeVisible(_loadFile);
     _loadFile.onClick = [this]
     {
-        _rmsWindows = ta::analyseFile(juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"});
+        auto path   = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
+        _rmsWindows = ta::analyseFile(path);
         repaint();
     };
 
@@ -104,6 +132,10 @@ void MainComponent::paint(juce::Graphics& g)
     auto const rmsPath = rmsWindowsToPath(_rmsWindows, _drawArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
+
+    auto const rmsAveragePath = rmsAverageToPath(rollingAverage(_rmsWindows), _drawArea);
+    g.setColour(juce::Colours::blue);
+    g.strokePath(rmsAveragePath, juce::PathStrokeType(1.0));
 }
 
 void MainComponent::resized()

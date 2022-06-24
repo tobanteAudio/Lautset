@@ -12,7 +12,10 @@ auto loadAudioFileToBuffer(juce::File const& file, size_t maxLength) -> BufferWi
 {
     juce::AudioFormatManager manager;
     manager.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> formatReader(manager.createReaderFor(file));
+
+    juce::MemoryMappedFile mapped{file, juce::MemoryMappedFile::readOnly};
+    auto imap = std::make_unique<juce::MemoryInputStream>(mapped.getData(), mapped.getSize(), false);
+    std::unique_ptr<juce::AudioFormatReader> formatReader(manager.createReaderFor(std::move(imap)));
 
     if (formatReader == nullptr) return {};
 
@@ -20,8 +23,12 @@ auto loadAudioFileToBuffer(juce::File const& file, size_t maxLength) -> BufferWi
     auto const lengthToLoad = maxLength == 0 ? fileLength : juce::jmin(maxLength, fileLength);
 
     BufferWithSampleRate result{
-        {juce::jlimit(1, 2, static_cast<int>(formatReader->numChannels)), static_cast<int>(lengthToLoad)},
-        formatReader->sampleRate};
+        juce::AudioBuffer<float>{
+            juce::jlimit(1, 2, static_cast<int>(formatReader->numChannels)),
+            static_cast<int>(lengthToLoad),
+        },
+        formatReader->sampleRate,
+    };
 
     formatReader->read(result.buffer.getArrayOfWritePointers(), result.buffer.getNumChannels(), 0,
                        result.buffer.getNumSamples());
