@@ -1,19 +1,12 @@
 #include "MainComponent.hpp"
 
-#include "dsp/BufferWithSampleRate.hpp"
-#include "dsp/Duration.hpp"
+#include <juce_dsp/juce_dsp.h>
 
 namespace ta
 {
 
-auto analyseFile(juce::File const& path) -> std::vector<LevelWindow>
+auto analyseFile(BufferWithSampleRate buffer) -> std::vector<LevelWindow>
 {
-    DBG("Load");
-    if (!path.existsAsFile()) return {};
-    auto const buffer = loadAudioFileToBuffer(path, 0);
-    if (buffer.buffer.getNumSamples() == 0) return {};
-    DBG("Load Finished");
-
     auto const windowLength      = Milliseconds<float>{10000.0f};
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
     auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
@@ -82,6 +75,12 @@ auto rmsAverageToPath(std::vector<float> const& averages, juce::Rectangle<int> a
     return containerToPath(averages.size(), area, [&averages](std::size_t i) { return averages[i]; });
 }
 
+auto audioBufferToPath(juce::AudioBuffer<float> const& buffer, juce::Rectangle<int> area) -> juce::Path
+{
+    return containerToPath(static_cast<std::size_t>(buffer.getNumSamples()), area,
+                           [&buffer](std::size_t i) { return buffer.getSample(0, (int)i); });
+}
+
 template<typename ContainerAccess>
 auto average(std::size_t count, ContainerAccess access) -> float
 {
@@ -104,13 +103,37 @@ auto rollingAverage(std::vector<ta::LevelWindow> const& windows) -> std::vector<
     return averages;
 }
 
+auto applyBallisticFilter(ta::BufferWithSampleRate const& buf) -> juce::AudioBuffer<float>
+{
+    auto filter = juce::dsp::BallisticsFilter<float>{};
+    filter.setLevelCalculationType(juce::dsp::BallisticsFilter<float>::LevelCalculationType::RMS);
+    filter.setAttackTime(ta::Milliseconds<float>{10'000.0f}.count());
+    filter.setReleaseTime(ta::Milliseconds<float>{10'000.0f}.count());
+    filter.prepare({
+        buf.sampleRate,
+        static_cast<uint32_t>(buf.buffer.getNumChannels()),
+        static_cast<uint32_t>(buf.buffer.getNumSamples()),
+    });
+
+    auto filtered = juce::AudioBuffer<float>{buf.buffer.getNumChannels(), buf.buffer.getNumSamples()};
+    auto inBlock  = juce::dsp::AudioBlock<float const>{buf.buffer};
+    auto outBlock = juce::dsp::AudioBlock<float>{filtered};
+    filter.process(juce::dsp::ProcessContextNonReplacing<float>{inBlock, outBlock});
+    return filtered;
+}
+
 MainComponent::MainComponent()
 {
     addAndMakeVisible(_loadFile);
     _loadFile.onClick = [this]
     {
-        auto path   = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
-        _rmsWindows = ta::analyseFile(path);
+        auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
+        // auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
+        if (!path.existsAsFile()) { return; }
+        _audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 4.0);
+        if (_audioBuffer.buffer.getNumSamples() == 0) { return; }
+        _rmsWindows = ta::analyseFile(_audioBuffer);
+        _filtered   = applyBallisticFilter(_audioBuffer);
         repaint();
     };
 
@@ -125,6 +148,8 @@ void MainComponent::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white);
     g.fillRect(_drawArea);
 
+    if (_rmsWindows.empty()) { return; }
+
     auto const peakPath = peakWindowsToPath(_rmsWindows, _drawArea);
     g.setColour(juce::Colours::red);
     g.strokePath(peakPath, juce::PathStrokeType(1.0));
@@ -136,6 +161,10 @@ void MainComponent::paint(juce::Graphics& g)
     auto const rmsAveragePath = rmsAverageToPath(rollingAverage(_rmsWindows), _drawArea);
     g.setColour(juce::Colours::blue);
     g.strokePath(rmsAveragePath, juce::PathStrokeType(1.0));
+
+    auto const filteredPath = audioBufferToPath(_filtered, _drawArea);
+    g.setColour(juce::Colours::green);
+    g.strokePath(filteredPath, juce::PathStrokeType(1.0));
 }
 
 void MainComponent::resized()

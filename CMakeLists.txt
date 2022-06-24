@@ -19,6 +19,19 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CheckCXXCompilerFlag)
+if(MSVC)
+    check_cxx_compiler_flag("/arch:AVX2" COMPILER_AVX2_SUPPORTED)
+    if(COMPILER_AVX2_SUPPORTED)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+    endif()
+else()
+    check_cxx_compiler_flag("-march=icelake-client" COMPILER_ICELAKE_CLIENT_SUPPORTED)
+    if(COMPILER_ICELAKE_CLIENT_SUPPORTED)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=icelake-client")
+    endif()
+endif()
+
 add_subdirectory(3rd_party/JUCE EXCLUDE_FROM_ALL)
 
 juce_add_gui_app(${PROJECT_NAME} PRODUCT_NAME "Lautset")
@@ -56,9 +69,10 @@ target_compile_definitions(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         juce::juce_audio_formats
+        juce::juce_dsp
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
-        # juce::juce_recommended_lto_flags
+        juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "dsp/BufferWithSampleRate.hpp"
+#include "dsp/Duration.hpp"
+
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -25,7 +28,9 @@ private:
     juce::TextButton _loadFile{"Load File"};
     juce::Rectangle<int> _drawArea{};
 
+    ta::BufferWithSampleRate _audioBuffer{};
     std::vector<ta::LevelWindow> _rmsWindows;
+    juce::AudioBuffer<float> _filtered;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
