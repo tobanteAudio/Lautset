@@ -25,8 +25,7 @@ private:
     juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
     juce::AudioFormatManager _formatManager;
 
-    juce::CriticalSection _mutex;
-    ta::BufferWithSampleRate _audioBuffer{};
+    std::shared_ptr<ta::BufferWithSampleRate const> _audioBuffer{};
     ta::LoudnessAnalysis::Result _analysis{};
 
     juce::AudioThumbnailCache _thumbnailCache{1};

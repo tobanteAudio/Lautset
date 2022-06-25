@@ -28,7 +28,9 @@ LoudnessAnalysis::LoudnessAnalysis(Options options) : _options{std::move(options
 
 auto LoudnessAnalysis::operator()() -> Result
 {
-    auto rmsWindows = analyseFile(_options.buffer, _options.windowLength);
+    jassert(_options.buffer != nullptr);
+
+    auto rmsWindows = analyseFile(*_options.buffer, _options.windowLength);
 
     auto rmsBins = std::vector<int>{};
     rmsBins.resize(81U);

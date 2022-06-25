@@ -15,7 +15,7 @@ struct LevelWindow
 
 struct LoudnessAnalysisOptions
 {
-    BufferWithSampleRate buffer;
+    std::shared_ptr<BufferWithSampleRate const> buffer;
     Milliseconds<float> windowLength{};
 };
 

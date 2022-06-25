@@ -76,8 +76,6 @@ void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
-    juce::ScopedLock lock{_mutex};
-
     g.setColour(juce::Colours::white);
     g.fillRect(_rmsWindowsArea);
     g.fillRect(_rmsBinsArea);
@@ -154,14 +152,15 @@ auto MainComponent::loadFile(juce::File const& file) -> void
         auto audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 8.0);
         if (audioBuffer.buffer.getNumSamples() == 0) { return; }
 
-        {
-            juce::ScopedLock lock{_mutex};
-            _audioBuffer = std::move(audioBuffer);
-        }
+        auto ptr = std::make_shared<ta::BufferWithSampleRate const>(std::move(audioBuffer));
 
-        analyseAudio();
-
-        juce::MessageManager::callAsync([this] { repaint(); });
+        juce::MessageManager::callAsync(
+            [this, ptr]
+            {
+                _audioBuffer = std::move(ptr);
+                analyseAudio();
+                repaint();
+            });
     };
 
     _threadPool.addJob(task);
@@ -169,23 +168,18 @@ auto MainComponent::loadFile(juce::File const& file) -> void
 
 auto MainComponent::analyseAudio() -> void
 {
-    auto task = [this, windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()}]
+    auto windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()};
+    auto task       = [this, windowSize, buffer = _audioBuffer]
     {
-        auto options = ta::LoudnessAnalysis::Options{{}, windowSize};
-        {
-            juce::ScopedLock lock{_mutex};
-            options.buffer = _audioBuffer;
-        }
-
-        auto analyzer = ta::LoudnessAnalysis{options};
+        auto analyzer = ta::LoudnessAnalysis{{buffer, windowSize}};
         auto result   = analyzer();
 
-        {
-            juce::ScopedLock lock{_mutex};
-            _analysis = std::move(result);
-        }
-
-        juce::MessageManager::callAsync([this] { repaint(); });
+        juce::MessageManager::callAsync(
+            [this, result = std::move(result)]
+            {
+                _analysis = std::move(result);
+                repaint();
+            });
     };
 
     _threadPool.addJob(task);
