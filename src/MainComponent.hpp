@@ -35,6 +35,7 @@ private:
     juce::TextButton _loadFile{"Load File"};
     juce::TextButton _analyze{"Analyze"};
     juce::Slider _rmsWindowLength{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
+    juce::Slider _rmsThreshold{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
     juce::Rectangle<float> _rmsWindowsArea{};
     juce::Rectangle<float> _rmsBinsArea{};
     juce::Rectangle<float> _thumbnailArea{};

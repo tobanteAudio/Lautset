@@ -49,11 +49,15 @@ MainComponent::MainComponent()
     addAndMakeVisible(_loadFile);
     addAndMakeVisible(_analyze);
     addAndMakeVisible(_rmsWindowLength);
+    addAndMakeVisible(_rmsThreshold);
 
     _thumbnail.addChangeListener(this);
 
     _rmsWindowLength.setRange(juce::Range<double>{1'000.0, 45'000.0}, 100.0);
     _rmsWindowLength.setValue(5'000.0);
+
+    _rmsThreshold.setRange(juce::Range<double>{-30.0, 0.0}, 1.0);
+    _rmsThreshold.setValue(-18.0);
 
     _loadFile.onClick = [this]
     {
@@ -84,18 +88,32 @@ void MainComponent::paint(juce::Graphics& g)
 
     if (_analysis.rmsWindows.empty()) { return; }
 
+    auto const numWindows = _analysis.rmsWindows.size();
+    auto const numBins    = _analysis.rmsBins.size();
+
+    auto windowWidth = _thumbnailArea.getWidth() / (float)numWindows;
+    auto threshold   = _rmsThreshold.getValue();
+    for (auto i{0U}; i < numWindows; ++i)
+    {
+        auto dB   = juce::Decibels::gainToDecibels(_analysis.rmsWindows[i].rms);
+        auto area = _thumbnailArea.withWidth(windowWidth).withX(i * windowWidth);
+        g.setColour(dB <= threshold ? juce::Colours::green.withAlpha(0.3f) : juce::Colours::red.withAlpha(0.3f));
+        g.fillRect(area);
+    }
+
     auto rmsPath = ta::rmsWindowsToPath(_analysis.rmsWindows, _rmsWindowsArea);
+    g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
     if (_analysis.rmsBins.empty()) { return; }
 
     auto max = *std::max_element(_analysis.rmsBins.begin(), _analysis.rmsBins.end());
 
-    for (auto i = 0U; i < _analysis.rmsBins.size(); ++i)
+    for (auto i{0U}; i < numBins; ++i)
     {
         auto bin = _analysis.rmsBins[i];
         if (bin == 0) { continue; }
-        auto const fsize  = static_cast<float>(_analysis.rmsBins.size());
+        auto const fsize  = static_cast<float>(numBins);
         auto const height = _rmsBinsArea.getHeight() * ((float)bin / (float)max);
         auto const x      = (fsize - static_cast<float>(i)) / fsize * _rmsBinsArea.getWidth();
         g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_rmsBinsArea.getBottom()));
@@ -112,6 +130,7 @@ void MainComponent::resized()
     _loadFile.setBounds(area.removeFromTop(controlHeight));
     _analyze.setBounds(area.removeFromTop(controlHeight));
     _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
+    _rmsThreshold.setBounds(area.removeFromBottom(controlHeight));
 
     auto const windowHeight = area.proportionOfHeight(0.3f);
     _thumbnailArea          = area.removeFromTop(windowHeight).toFloat();
