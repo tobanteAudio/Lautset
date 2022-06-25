@@ -22,7 +22,7 @@ jobs:
           arch: x64
 
       - name: CMake configure -- Release
-        run: cmake -S . -B cmake-build-release -G "Visual Studio 16 2019" -T ClangCL -D CMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B cmake-build-release -G "Visual Studio 16 2019" -T ClangCL -D CMAKE_BUILD_TYPE=Release -D LAUTSET_ENABLE_LTO=ON
 
       - name: CMake build -- Release
         run: cmake --build cmake-build-release --config "Release"

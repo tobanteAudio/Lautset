@@ -114,11 +114,11 @@ void MainComponent::paint(juce::Graphics& g)
     juce::ScopedLock lock{_mutex};
 
     g.setColour(juce::Colours::white);
-    g.fillRect(_drawArea);
+    g.fillRect(_rmsWindowsArea);
 
     if (_rmsWindows.empty()) { return; }
 
-    auto rmsPath = rmsWindowsToPath(_rmsWindows, _drawArea);
+    auto rmsPath = rmsWindowsToPath(_rmsWindows, _rmsWindowsArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
@@ -130,22 +130,26 @@ void MainComponent::paint(juce::Graphics& g)
     {
         auto bin = _rmsBins[i];
         if (bin == 0.0f) { continue; }
-        auto const height = _drawArea.getHeight() * ((float)bin / (float)max);
-        auto const x      = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _drawArea.getWidth();
-        g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_drawArea.getBottom()));
+        auto const height = _rmsBinsArea.getHeight() * ((float)bin / (float)max);
+        auto const x      = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _rmsBinsArea.getWidth();
+        g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_rmsBinsArea.getBottom()));
 
-        auto textArea = juce::Rectangle<int>((int)x, 0, 40, 40).withBottomY(_drawArea.getBottom());
+        auto textArea = juce::Rectangle<int>((int)x, 0, 40, 40).withBottomY(_rmsBinsArea.getBottom());
         g.drawText(juce::String(i), textArea, juce::Justification::centred);
     }
 }
 
 void MainComponent::resized()
 {
-    auto area = getLocalBounds();
-    _loadFile.setBounds(area.removeFromTop(area.proportionOfHeight(0.06f)));
-    _analyze.setBounds(area.removeFromTop(area.proportionOfHeight(0.06f)));
-    _rmsWindowLength.setBounds(area.removeFromBottom(area.proportionOfHeight(0.05f)));
-    _drawArea = area;
+    auto area                = getLocalBounds();
+    auto const controlHeight = area.proportionOfHeight(0.06f);
+    _loadFile.setBounds(area.removeFromTop(controlHeight));
+    _analyze.setBounds(area.removeFromTop(controlHeight));
+    _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
+
+    auto const windowHeight = area.proportionOfHeight(0.5f);
+    _rmsWindowsArea         = area.removeFromBottom(windowHeight);
+    _rmsBinsArea            = area;
 }
 
 auto MainComponent::loadFile(juce::File const& file) -> void

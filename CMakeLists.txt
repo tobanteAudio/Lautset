@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(Lautset VERSION 0.1.0)
 
+option(LAUTSET_ENABLE_LTO "Build with LTO enabled" OFF)
+
 # Caches build artifacts for faster builds
 find_program(CCACHE ccache)
 if (CCACHE)
@@ -18,7 +20,6 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -64,6 +65,6 @@ target_link_libraries(${PROJECT_NAME}
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
+        $<$<BOOL:${LAUTSET_ENABLE_LTO}>:juce::juce_recommended_lto_flags>
 )
