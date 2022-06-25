@@ -34,8 +34,8 @@ private:
     juce::TextButton _loadFile{"Load File"};
     juce::TextButton _analyze{"Analyze"};
     juce::Slider _rmsWindowLength{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
-    juce::Rectangle<int> _rmsWindowsArea{};
-    juce::Rectangle<int> _rmsBinsArea{};
+    juce::Rectangle<float> _rmsWindowsArea{};
+    juce::Rectangle<float> _rmsBinsArea{};
 
     ta::BufferWithSampleRate _audioBuffer{};
     std::vector<ta::LevelWindow> _rmsWindows;

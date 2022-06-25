@@ -5,6 +5,8 @@
 namespace ta
 {
 
+namespace
+{
 auto analyseFile(BufferWithSampleRate buffer, Milliseconds<float> windowLength) -> std::vector<LevelWindow>
 {
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
@@ -16,16 +18,13 @@ auto analyseFile(BufferWithSampleRate buffer, Milliseconds<float> windowLength) 
     for (auto i{0U}; i < numWindows; ++i)
     {
         auto const windowStart = i * windowSampleCount;
-        auto const peak        = buffer.buffer.getMagnitude(0, windowStart, windowSampleCount);
-        auto const rms         = buffer.buffer.getRMSLevel(0, windowStart, windowSampleCount);
+        auto const peak        = buffer.buffer.getMagnitude(0, (int)windowStart, (int)windowSampleCount);
+        auto const rms         = buffer.buffer.getRMSLevel(0, (int)windowStart, (int)windowSampleCount);
         rmsWindows.push_back(LevelWindow{peak, rms});
     }
 
     return rmsWindows;
 }
-
-}  // namespace ta
-
 auto positionForGain(float gain, float top, float bottom) -> float
 {
     static constexpr auto minDB = -30.0f;
@@ -34,7 +33,7 @@ auto positionForGain(float gain, float top, float bottom) -> float
 }
 
 template<typename ContainerAccess>
-auto containerToPath(std::size_t size, juce::Rectangle<int> area, ContainerAccess access) -> juce::Path
+auto containerToPath(std::size_t size, juce::Rectangle<float> area, ContainerAccess access) -> juce::Path
 {
     if (size == 0U) { return {}; }
 
@@ -46,7 +45,7 @@ auto containerToPath(std::size_t size, juce::Rectangle<int> area, ContainerAcces
 
     for (auto i{1U}; i < size; ++i)
     {
-        auto const x = static_cast<float>(i) / size * area.getWidth();
+        auto const x = static_cast<float>(i) / (float)size * area.getWidth();
         auto const y = positionForGain(access(i), area.getY(), area.getBottom());
         path.lineTo(juce::Point<float>(x, y));
     }
@@ -54,36 +53,13 @@ auto containerToPath(std::size_t size, juce::Rectangle<int> area, ContainerAcces
     return path;
 }
 
-auto rmsWindowsToPath(std::vector<ta::LevelWindow> const& windows, juce::Rectangle<int> area) -> juce::Path
+auto rmsWindowsToPath(std::vector<LevelWindow> const& windows, juce::Rectangle<float> area) -> juce::Path
 {
     return containerToPath(windows.size(), area, [&windows](std::size_t i) { return windows[i].rms; });
 }
 
-auto applyBallisticFilter(ta::BufferWithSampleRate const& buf, ta::Milliseconds<double> env) -> juce::AudioBuffer<float>
-{
-    auto doubleInput = juce::AudioBuffer<double>{};
-    doubleInput.makeCopyOf(buf.buffer);
-
-    auto filter = juce::dsp::BallisticsFilter<double>{};
-    filter.setLevelCalculationType(juce::dsp::BallisticsFilter<double>::LevelCalculationType::RMS);
-    filter.setAttackTime(env.count());
-    filter.setReleaseTime(env.count());
-    filter.prepare({
-        buf.sampleRate,
-        static_cast<uint32_t>(buf.buffer.getNumChannels()),
-        static_cast<uint32_t>(buf.buffer.getNumSamples()),
-    });
-
-    auto filtered = juce::AudioBuffer<double>{buf.buffer.getNumChannels(), buf.buffer.getNumSamples()};
-    auto inBlock  = juce::dsp::AudioBlock<double const>{doubleInput};
-    auto outBlock = juce::dsp::AudioBlock<double>{filtered};
-    filter.process(juce::dsp::ProcessContextNonReplacing<double>{inBlock, outBlock});
-
-    auto floatOutput = juce::AudioBuffer<float>{};
-    floatOutput.makeCopyOf(filtered);
-
-    return floatOutput;
-}
+}  // namespace
+}  // namespace ta
 
 MainComponent::MainComponent()
 {
@@ -118,7 +94,7 @@ void MainComponent::paint(juce::Graphics& g)
 
     if (_rmsWindows.empty()) { return; }
 
-    auto rmsPath = rmsWindowsToPath(_rmsWindows, _rmsWindowsArea);
+    auto rmsPath = ta::rmsWindowsToPath(_rmsWindows, _rmsWindowsArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
@@ -129,12 +105,13 @@ void MainComponent::paint(juce::Graphics& g)
     for (auto i = 0U; i < _rmsBins.size(); ++i)
     {
         auto bin = _rmsBins[i];
-        if (bin == 0.0f) { continue; }
+        if (bin == 0) { continue; }
+        auto const fsize  = static_cast<float>(_rmsBins.size());
         auto const height = _rmsBinsArea.getHeight() * ((float)bin / (float)max);
-        auto const x      = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _rmsBinsArea.getWidth();
+        auto const x      = (fsize - static_cast<float>(i)) / fsize * _rmsBinsArea.getWidth();
         g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_rmsBinsArea.getBottom()));
 
-        auto textArea = juce::Rectangle<int>((int)x, 0, 40, 40).withBottomY(_rmsBinsArea.getBottom());
+        auto textArea = juce::Rectangle<float>(x, 0, 40, 40).withBottomY(_rmsBinsArea.getBottom());
         g.drawText(juce::String(i), textArea, juce::Justification::centred);
     }
 }
@@ -148,8 +125,8 @@ void MainComponent::resized()
     _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
 
     auto const windowHeight = area.proportionOfHeight(0.5f);
-    _rmsWindowsArea         = area.removeFromBottom(windowHeight);
-    _rmsBinsArea            = area;
+    _rmsWindowsArea         = area.removeFromBottom(windowHeight).toFloat();
+    _rmsBinsArea            = area.toFloat();
 }
 
 auto MainComponent::loadFile(juce::File const& file) -> void
