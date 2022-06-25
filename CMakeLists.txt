@@ -68,6 +68,7 @@ target_compile_definitions(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         juce::juce_audio_formats
+        juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_extra
     PUBLIC

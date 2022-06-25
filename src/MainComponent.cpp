@@ -50,6 +50,8 @@ MainComponent::MainComponent()
     addAndMakeVisible(_analyze);
     addAndMakeVisible(_rmsWindowLength);
 
+    _thumbnail.addChangeListener(this);
+
     _rmsWindowLength.setRange(juce::Range<double>{1'000.0, 45'000.0}, 100.0);
     _rmsWindowLength.setValue(5'000.0);
 
@@ -75,11 +77,14 @@ void MainComponent::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white);
     g.fillRect(_rmsWindowsArea);
     g.fillRect(_rmsBinsArea);
+    g.fillRect(_thumbnailArea);
+
+    g.setColour(juce::Colours::black);
+    _thumbnail.drawChannels(g, _thumbnailArea.toNearestInt(), 0.0, _thumbnail.getTotalLength(), 1.0f);
 
     if (_analysis.rmsWindows.empty()) { return; }
 
     auto rmsPath = ta::rmsWindowsToPath(_analysis.rmsWindows, _rmsWindowsArea);
-    g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
     if (_analysis.rmsBins.empty()) { return; }
@@ -108,13 +113,21 @@ void MainComponent::resized()
     _analyze.setBounds(area.removeFromTop(controlHeight));
     _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
 
-    auto const windowHeight = area.proportionOfHeight(0.5f);
-    _rmsWindowsArea         = area.removeFromBottom(windowHeight).toFloat();
+    auto const windowHeight = area.proportionOfHeight(0.3f);
+    _thumbnailArea          = area.removeFromTop(windowHeight).toFloat();
+    _rmsWindowsArea         = area.removeFromTop(windowHeight).toFloat();
     _rmsBinsArea            = area.toFloat();
+}
+
+auto MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source) -> void
+{
+    if (source == &_thumbnail) { repaint(); }
 }
 
 auto MainComponent::loadFile(juce::File const& file) -> void
 {
+    _thumbnail.setSource(new juce::FileInputSource(file));
+
     auto task = [this, path = file]
     {
         if (!path.existsAsFile()) { return; }
