@@ -4,7 +4,7 @@ namespace ta
 {
 namespace
 {
-auto analyseFile(BufferWithSampleRate buffer, Milliseconds<float> windowLength) -> std::vector<LevelWindow>
+auto analyseFile(BufferWithSampleRate const& buffer, Milliseconds<float> windowLength) -> std::vector<LevelWindow>
 {
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
     auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
@@ -37,8 +37,8 @@ auto LoudnessAnalysis::operator()() -> Result
     for (auto const& window : rmsWindows)
     {
         auto dB = juce::Decibels::gainToDecibels(window.rms);
-        if (dB <= -80.0f) { continue; }
-        if (dB > 0.0f) { continue; }
+        if (dB <= -80.0F) { continue; }
+        if (dB > 0.0F) { continue; }
 
         auto index = static_cast<std::size_t>(std::round(std::abs(dB)));
         rmsBins[index] += 1;

@@ -15,7 +15,7 @@ struct MainComponent final
 {
     MainComponent();
 
-    auto paint(juce::Graphics&) -> void override;
+    auto paint(juce::Graphics& g) -> void override;
     auto resized() -> void override;
 
 private:
@@ -40,6 +40,4 @@ private:
     juce::Rectangle<float> _rmsWindowsArea{};
     juce::Rectangle<float> _rmsBinsArea{};
     juce::Rectangle<float> _thumbnailArea{};
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

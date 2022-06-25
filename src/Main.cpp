@@ -1,30 +1,32 @@
+#include <memory>
+
 #include "MainComponent.hpp"
 
-class GuiAppApplication : public juce::JUCEApplication
+class LautsetApplication : public juce::JUCEApplication
 {
 public:
-    GuiAppApplication() {}
+    LautsetApplication() = default;
 
     // We inject these as compile definitions from the CMakeLists.txt
     // If you've enabled the juce header with `juce_generate_juce_header(<thisTarget>)`
     // you could `#include <JuceHeader.h>` and use `ProjectInfo::projectName` etc. instead.
-    const juce::String getApplicationName() override { return JUCE_APPLICATION_NAME_STRING; }
-    const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override { return true; }
+    auto getApplicationName() -> const juce::String override { return JUCE_APPLICATION_NAME_STRING; }
+    auto getApplicationVersion() -> const juce::String override { return JUCE_APPLICATION_VERSION_STRING; }
+    auto moreThanOneInstanceAllowed() -> bool override { return true; }
 
     void initialise(juce::String const& commandLine) override
     {
         // This method is where you should put your application's initialisation code..
         juce::ignoreUnused(commandLine);
 
-        mainWindow.reset(new MainWindow(getApplicationName()));
+        _mainWindow = std::make_unique<MainWindow>(getApplicationName());
     }
 
     void shutdown() override
     {
         // Add your application's shutdown code here..
 
-        mainWindow = nullptr;  // (deletes our window)
+        _mainWindow = nullptr;  // (deletes our window)
     }
 
     void systemRequestedQuit() override
@@ -49,14 +51,14 @@ public:
     class MainWindow : public juce::DocumentWindow
     {
     public:
-        explicit MainWindow(juce::String name)
+        explicit MainWindow(juce::String const& name)
             : DocumentWindow(
                 name,
                 juce::Desktop::getInstance().getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
                 DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar(true);
-            setContentOwned(new MainComponent(), true);
+            setContentOwned(std::make_unique<MainComponent>().release(), true);
 
 #if JUCE_IOS || JUCE_ANDROID
             setFullScreen(true);
@@ -82,14 +84,11 @@ public:
            you really have to override any DocumentWindow methods, make sure your
            subclass also calls the superclass's method.
         */
-
-    private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
     };
 
 private:
-    std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<MainWindow> _mainWindow;
 };
 
 // This macro generates the main() routine that launches the app.
-START_JUCE_APPLICATION(GuiAppApplication)
+START_JUCE_APPLICATION(LautsetApplication)  // NOLINT

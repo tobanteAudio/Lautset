@@ -10,8 +10,8 @@ namespace
 
 auto positionForGain(float gain, float top, float bottom) -> float
 {
-    static constexpr auto minDB = -30.0f;
-    static constexpr auto maxDB = 0.1f;
+    static constexpr auto minDB = -30.0F;
+    static constexpr auto maxDB = 0.1F;
     return juce::jmap(juce::Decibels::gainToDecibels(gain, minDB), minDB, maxDB, bottom, top);
 }
 
@@ -24,7 +24,7 @@ auto containerToPath(std::size_t size, juce::Rectangle<float> area, ContainerAcc
     path.preallocateSpace(static_cast<int>(size));
 
     auto const firstY = positionForGain(access(0U), area.getY(), area.getBottom());
-    path.startNewSubPath(juce::Point<float>(0.0f, firstY));
+    path.startNewSubPath(juce::Point<float>(0.0F, firstY));
 
     for (auto i{1U}; i < size; ++i)
     {
@@ -84,7 +84,7 @@ void MainComponent::paint(juce::Graphics& g)
     g.fillRect(_thumbnailArea);
 
     g.setColour(juce::Colours::black);
-    _thumbnail.drawChannels(g, _thumbnailArea.toNearestInt(), 0.0, _thumbnail.getTotalLength(), 1.0f);
+    _thumbnail.drawChannels(g, _thumbnailArea.toNearestInt(), 0.0, _thumbnail.getTotalLength(), 1.0F);
 
     if (_analysis.rmsWindows.empty()) { return; }
 
@@ -96,8 +96,8 @@ void MainComponent::paint(juce::Graphics& g)
     for (auto i{0U}; i < numWindows; ++i)
     {
         auto dB   = juce::Decibels::gainToDecibels(_analysis.rmsWindows[i].rms);
-        auto area = _thumbnailArea.withWidth(windowWidth).withX(i * windowWidth);
-        g.setColour(dB <= threshold ? juce::Colours::green.withAlpha(0.3f) : juce::Colours::red.withAlpha(0.3f));
+        auto area = _thumbnailArea.withWidth(windowWidth).withX((float)i * windowWidth);
+        g.setColour(dB <= threshold ? juce::Colours::green.withAlpha(0.3F) : juce::Colours::red.withAlpha(0.3F));
         g.fillRect(area);
     }
 
@@ -116,7 +116,7 @@ void MainComponent::paint(juce::Graphics& g)
         auto const fsize  = static_cast<float>(numBins);
         auto const height = _rmsBinsArea.getHeight() * ((float)bin / (float)max);
         auto const x      = (fsize - static_cast<float>(i)) / fsize * _rmsBinsArea.getWidth();
-        g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_rmsBinsArea.getBottom()));
+        g.fillRect(juce::Rectangle<float>(x, 0, 8.0F, height).withBottomY(_rmsBinsArea.getBottom()));
 
         auto textArea = juce::Rectangle<float>(x, 0, 40, 40).withBottomY(_rmsBinsArea.getBottom());
         g.drawText(juce::String(i), textArea, juce::Justification::centred);
@@ -126,13 +126,13 @@ void MainComponent::paint(juce::Graphics& g)
 void MainComponent::resized()
 {
     auto area                = getLocalBounds();
-    auto const controlHeight = area.proportionOfHeight(0.06f);
+    auto const controlHeight = area.proportionOfHeight(0.06F);
     _loadFile.setBounds(area.removeFromTop(controlHeight));
     _analyze.setBounds(area.removeFromTop(controlHeight));
     _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
     _rmsThreshold.setBounds(area.removeFromBottom(controlHeight));
 
-    auto const windowHeight = area.proportionOfHeight(0.3f);
+    auto const windowHeight = area.proportionOfHeight(0.3F);
     _thumbnailArea          = area.removeFromTop(windowHeight).toFloat();
     _rmsWindowsArea         = area.removeFromTop(windowHeight).toFloat();
     _rmsBinsArea            = area.toFloat();
@@ -146,7 +146,7 @@ auto MainComponent::handleAsyncUpdate() -> void { analyseAudio(); }
 
 auto MainComponent::loadFile(juce::File const& file) -> void
 {
-    _thumbnail.setSource(new juce::FileInputSource(file));
+    _thumbnail.setSource(std::make_unique<juce::FileInputSource>(file).release());
 
     auto task = [this, path = file]
     {
@@ -160,7 +160,7 @@ auto MainComponent::loadFile(juce::File const& file) -> void
         juce::MessageManager::callAsync(
             [this, ptr]
             {
-                _audioBuffer = std::move(ptr);
+                _audioBuffer = ptr;
                 analyseAudio();
                 repaint();
             });
@@ -182,7 +182,7 @@ auto MainComponent::analyseAudio() -> void
         juce::MessageManager::callAsync(
             [this, result = std::move(result)]
             {
-                _analysis = std::move(result);
+                _analysis = result;
                 repaint();
             });
     };

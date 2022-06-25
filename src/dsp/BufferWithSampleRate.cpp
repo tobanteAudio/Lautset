@@ -3,11 +3,6 @@
 namespace ta
 {
 
-BufferWithSampleRate::BufferWithSampleRate(juce::AudioBuffer<float>&& bufferIn, double sampleRateIn)
-    : buffer(std::move(bufferIn)), sampleRate(sampleRateIn)
-{
-}
-
 auto loadAudioFileToBuffer(juce::File const& file, size_t maxLength) -> BufferWithSampleRate
 {
     juce::AudioFormatManager manager;
@@ -17,7 +12,7 @@ auto loadAudioFileToBuffer(juce::File const& file, size_t maxLength) -> BufferWi
     auto imap = std::make_unique<juce::MemoryInputStream>(mapped.getData(), mapped.getSize(), false);
     std::unique_ptr<juce::AudioFormatReader> formatReader(manager.createReaderFor(std::move(imap)));
 
-    if (formatReader == nullptr) return {};
+    if (formatReader == nullptr) { return {}; }
 
     auto const fileLength   = static_cast<size_t>(formatReader->lengthInSamples);
     auto const lengthToLoad = maxLength == 0 ? fileLength : juce::jmin(maxLength, fileLength);
