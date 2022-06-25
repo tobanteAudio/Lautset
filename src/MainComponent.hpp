@@ -25,16 +25,21 @@ public:
 
 private:
     auto loadFile(juce::File const& file) -> void;
+    auto analyseAudio() -> void;
 
     juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
 
     juce::CriticalSection _mutex;
     juce::AudioFormatManager _formatManager;
     juce::TextButton _loadFile{"Load File"};
+    juce::TextButton _analyze{"Analyze"};
+    juce::Slider _rmsWindowLength{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
     juce::Rectangle<int> _drawArea{};
 
     ta::BufferWithSampleRate _audioBuffer{};
     std::vector<ta::LevelWindow> _rmsWindows;
+
+    std::vector<int> _rmsBins;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

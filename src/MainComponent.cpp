@@ -5,9 +5,8 @@
 namespace ta
 {
 
-auto analyseFile(BufferWithSampleRate buffer) -> std::vector<LevelWindow>
+auto analyseFile(BufferWithSampleRate buffer, Milliseconds<float> windowLength) -> std::vector<LevelWindow>
 {
-    auto const windowLength      = Milliseconds<float>{10000.0f};
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
     auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
 
@@ -89,13 +88,20 @@ auto applyBallisticFilter(ta::BufferWithSampleRate const& buf, ta::Milliseconds<
 MainComponent::MainComponent()
 {
     addAndMakeVisible(_loadFile);
+    addAndMakeVisible(_analyze);
+    addAndMakeVisible(_rmsWindowLength);
+
+    _rmsWindowLength.setRange(juce::Range<double>{1'000.0, 45'000.0}, 100.0);
+    _rmsWindowLength.setValue(5'000.0);
 
     _loadFile.onClick = [this]
     {
-        // auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
-        auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
+        auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
+        // auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
         loadFile(path);
     };
+
+    _analyze.onClick = [this] { analyseAudio(); };
 
     _formatManager.registerBasicFormats();
     setSize(600, 400);
@@ -113,15 +119,32 @@ void MainComponent::paint(juce::Graphics& g)
     if (_rmsWindows.empty()) { return; }
 
     auto rmsPath = rmsWindowsToPath(_rmsWindows, _drawArea);
-
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
+
+    if (_rmsBins.empty()) { return; }
+
+    auto max = *std::max_element(_rmsBins.begin(), _rmsBins.end());
+
+    for (auto i = 0U; i < _rmsBins.size(); ++i)
+    {
+        auto bin = _rmsBins[i];
+        if (bin == 0.0f) { continue; }
+        auto const x = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _drawArea.getWidth();
+        auto const y = _drawArea.getY() + _drawArea.getHeight() * (1.0f - ((float)bin / (float)max));
+        g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, 8.0f, 8.0f).withCentre(juce::Point<float>(x, y)));
+
+        auto textArea = juce::Rectangle<int>((int)x, 0, 40, 40).withBottomY(_drawArea.getBottom());
+        g.drawText(juce::String(i), textArea, juce::Justification::centred);
+    }
 }
 
 void MainComponent::resized()
 {
     auto area = getLocalBounds();
-    _loadFile.setBounds(area.removeFromTop(area.proportionOfHeight(0.1f)));
+    _loadFile.setBounds(area.removeFromTop(area.proportionOfHeight(0.06f)));
+    _analyze.setBounds(area.removeFromTop(area.proportionOfHeight(0.06f)));
+    _rmsWindowLength.setBounds(area.removeFromBottom(area.proportionOfHeight(0.05f)));
     _drawArea = area;
 }
 
@@ -133,12 +156,45 @@ auto MainComponent::loadFile(juce::File const& file) -> void
 
         auto audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 8.0);
         if (audioBuffer.buffer.getNumSamples() == 0) { return; }
-        auto rmsWindows = ta::analyseFile(audioBuffer);
 
         {
             juce::ScopedLock lock{_mutex};
             _audioBuffer = std::move(audioBuffer);
-            _rmsWindows  = std::move(rmsWindows);
+        }
+
+        analyseAudio();
+
+        juce::MessageManager::callAsync([this] { repaint(); });
+    };
+
+    _threadPool.addJob(task);
+}
+
+auto MainComponent::analyseAudio() -> void
+{
+    auto task = [this, windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()}]
+    {
+        auto audioBuffer = ta::BufferWithSampleRate{};
+        {
+            juce::ScopedLock lock{_mutex};
+            audioBuffer = _audioBuffer;
+        }
+
+        auto rmsWindows = ta::analyseFile(audioBuffer, windowSize);
+
+        auto rmsBins = std::vector<int>{};
+        for (auto const& window : rmsWindows)
+        {
+            auto dB    = std::abs(juce::Decibels::gainToDecibels(window.rms));
+            auto index = static_cast<std::size_t>(std::round(dB));
+            if (index >= rmsBins.size()) { rmsBins.resize(index + 1, 0); }
+            rmsBins[index] += 1;
+        }
+
+        {
+            juce::ScopedLock lock{_mutex};
+            _rmsWindows = std::move(rmsWindows);
+            _rmsBins    = std::move(rmsBins);
         }
 
         juce::MessageManager::callAsync([this] { repaint(); });
