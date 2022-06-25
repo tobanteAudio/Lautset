@@ -2,18 +2,10 @@
 
 #include "dsp/BufferWithSampleRate.hpp"
 #include "dsp/Duration.hpp"
+#include "dsp/LoudnessAnalysis.hpp"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_gui_extra/juce_gui_extra.h>
-
-namespace ta
-{
-struct LevelWindow
-{
-    float peak{};
-    float rms{};
-};
-}  // namespace ta
 
 class MainComponent : public juce::Component
 {
@@ -30,17 +22,15 @@ private:
     juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
 
     juce::CriticalSection _mutex;
+    ta::BufferWithSampleRate _audioBuffer{};
+    ta::LoudnessAnalysis::Result _analysis{};
+
     juce::AudioFormatManager _formatManager;
     juce::TextButton _loadFile{"Load File"};
     juce::TextButton _analyze{"Analyze"};
     juce::Slider _rmsWindowLength{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
     juce::Rectangle<float> _rmsWindowsArea{};
     juce::Rectangle<float> _rmsBinsArea{};
-
-    ta::BufferWithSampleRate _audioBuffer{};
-    std::vector<ta::LevelWindow> _rmsWindows;
-
-    std::vector<int> _rmsBins;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

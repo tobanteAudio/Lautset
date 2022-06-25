@@ -40,6 +40,9 @@ target_sources(${PROJECT_NAME}
 
         src/dsp/BufferWithSampleRate.cpp
         src/dsp/BufferWithSampleRate.hpp
+        src/dsp/Duration.hpp
+        src/dsp/LoudnessAnalysis.cpp
+        src/dsp/LoudnessAnalysis.hpp
 )
 
 target_include_directories(${PROJECT_NAME}

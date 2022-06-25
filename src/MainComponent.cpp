@@ -7,24 +7,7 @@ namespace ta
 
 namespace
 {
-auto analyseFile(BufferWithSampleRate buffer, Milliseconds<float> windowLength) -> std::vector<LevelWindow>
-{
-    auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
-    auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
 
-    auto rmsWindows = std::vector<LevelWindow>{};
-    rmsWindows.reserve(numWindows);
-
-    for (auto i{0U}; i < numWindows; ++i)
-    {
-        auto const windowStart = i * windowSampleCount;
-        auto const peak        = buffer.buffer.getMagnitude(0, (int)windowStart, (int)windowSampleCount);
-        auto const rms         = buffer.buffer.getRMSLevel(0, (int)windowStart, (int)windowSampleCount);
-        rmsWindows.push_back(LevelWindow{peak, rms});
-    }
-
-    return rmsWindows;
-}
 auto positionForGain(float gain, float top, float bottom) -> float
 {
     static constexpr auto minDB = -30.0f;
@@ -91,22 +74,23 @@ void MainComponent::paint(juce::Graphics& g)
 
     g.setColour(juce::Colours::white);
     g.fillRect(_rmsWindowsArea);
+    g.fillRect(_rmsBinsArea);
 
-    if (_rmsWindows.empty()) { return; }
+    if (_analysis.rmsWindows.empty()) { return; }
 
-    auto rmsPath = ta::rmsWindowsToPath(_rmsWindows, _rmsWindowsArea);
+    auto rmsPath = ta::rmsWindowsToPath(_analysis.rmsWindows, _rmsWindowsArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
-    if (_rmsBins.empty()) { return; }
+    if (_analysis.rmsBins.empty()) { return; }
 
-    auto max = *std::max_element(_rmsBins.begin(), _rmsBins.end());
+    auto max = *std::max_element(_analysis.rmsBins.begin(), _analysis.rmsBins.end());
 
-    for (auto i = 0U; i < _rmsBins.size(); ++i)
+    for (auto i = 0U; i < _analysis.rmsBins.size(); ++i)
     {
-        auto bin = _rmsBins[i];
+        auto bin = _analysis.rmsBins[i];
         if (bin == 0) { continue; }
-        auto const fsize  = static_cast<float>(_rmsBins.size());
+        auto const fsize  = static_cast<float>(_analysis.rmsBins.size());
         auto const height = _rmsBinsArea.getHeight() * ((float)bin / (float)max);
         auto const x      = (fsize - static_cast<float>(i)) / fsize * _rmsBinsArea.getWidth();
         g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_rmsBinsArea.getBottom()));
@@ -155,30 +139,18 @@ auto MainComponent::analyseAudio() -> void
 {
     auto task = [this, windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()}]
     {
-        auto audioBuffer = ta::BufferWithSampleRate{};
+        auto options = ta::LoudnessAnalysis::Options{{}, windowSize};
         {
             juce::ScopedLock lock{_mutex};
-            audioBuffer = _audioBuffer;
+            options.buffer = _audioBuffer;
         }
 
-        auto rmsWindows = ta::analyseFile(audioBuffer, windowSize);
-
-        auto rmsBins = std::vector<int>{};
-        rmsBins.resize(81U);
-        for (auto const& window : rmsWindows)
-        {
-            auto dB = juce::Decibels::gainToDecibels(window.rms);
-            if (dB <= -80.0f) { continue; }
-            if (dB > 0.0f) { continue; }
-
-            auto index = static_cast<std::size_t>(std::round(std::abs(dB)));
-            rmsBins[index] += 1;
-        }
+        auto analyzer = ta::LoudnessAnalysis{options};
+        auto result   = analyzer();
 
         {
             juce::ScopedLock lock{_mutex};
-            _rmsWindows = std::move(rmsWindows);
-            _rmsBins    = std::move(rmsBins);
+            _analysis = std::move(result);
         }
 
         juce::MessageManager::callAsync([this] { repaint(); });
