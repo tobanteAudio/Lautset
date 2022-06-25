@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(Lautset VERSION 0.1.0)
 
-option(LAUTSET_ENABLE_LTO "Build with LTO enabled" OFF)
+option(LAUTSET_ENABLE_LTO       "Build with LTO enabled"                OFF)
+option(LAUTSET_ENABLE_WERROR    "Build with warnings as errors enabled" OFF)
 
 # Caches build artifacts for faster builds
 find_program(CCACHE ccache)
@@ -23,6 +24,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(compiler_warnings)
 
 add_subdirectory(3rd_party/JUCE EXCLUDE_FROM_ALL)
 
@@ -64,6 +68,7 @@ target_link_libraries(${PROJECT_NAME}
         juce::juce_dsp
         juce::juce_gui_extra
     PUBLIC
+        lautset::compiler_warnings
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
         $<$<BOOL:${LAUTSET_ENABLE_LTO}>:juce::juce_recommended_lto_flags>
