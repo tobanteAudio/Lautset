@@ -11,10 +11,6 @@ auto analyseFile(BufferWithSampleRate buffer) -> std::vector<LevelWindow>
     auto const windowSampleCount = static_cast<std::size_t>(toSampleCount(windowLength, buffer.sampleRate));
     auto const numWindows        = static_cast<std::size_t>(buffer.buffer.getNumSamples()) / windowSampleCount;
 
-    DBG("Window length: " + juce::String{toMilliseconds(windowLength).count()} + " ms");
-    DBG("Num Window:: " + juce::String{numWindows});
-
-    DBG("RMS Calc Start");
     auto rmsWindows = std::vector<LevelWindow>{};
     rmsWindows.reserve(numWindows);
 
@@ -25,7 +21,6 @@ auto analyseFile(BufferWithSampleRate buffer) -> std::vector<LevelWindow>
         auto const rms         = buffer.buffer.getRMSLevel(0, windowStart, windowSampleCount);
         rmsWindows.push_back(LevelWindow{peak, rms});
     }
-    DBG("RMS Calc Finished");
 
     return rmsWindows;
 }
@@ -60,81 +55,46 @@ auto containerToPath(std::size_t size, juce::Rectangle<int> area, ContainerAcces
     return path;
 }
 
-auto peakWindowsToPath(std::vector<ta::LevelWindow> const& windows, juce::Rectangle<int> area) -> juce::Path
-{
-    return containerToPath(windows.size(), area, [&windows](std::size_t i) { return windows[i].peak; });
-}
-
 auto rmsWindowsToPath(std::vector<ta::LevelWindow> const& windows, juce::Rectangle<int> area) -> juce::Path
 {
     return containerToPath(windows.size(), area, [&windows](std::size_t i) { return windows[i].rms; });
 }
 
-auto rmsAverageToPath(std::vector<float> const& averages, juce::Rectangle<int> area) -> juce::Path
+auto applyBallisticFilter(ta::BufferWithSampleRate const& buf, ta::Milliseconds<double> env) -> juce::AudioBuffer<float>
 {
-    return containerToPath(averages.size(), area, [&averages](std::size_t i) { return averages[i]; });
-}
+    auto doubleInput = juce::AudioBuffer<double>{};
+    doubleInput.makeCopyOf(buf.buffer);
 
-auto audioBufferToPath(juce::AudioBuffer<float> const& buffer, juce::Rectangle<int> area) -> juce::Path
-{
-    return containerToPath(static_cast<std::size_t>(buffer.getNumSamples()), area,
-                           [&buffer](std::size_t i) { return buffer.getSample(0, (int)i); });
-}
-
-template<typename ContainerAccess>
-auto average(std::size_t count, ContainerAccess access) -> float
-{
-    auto sum = 0.0f;
-    for (auto i{0U}; i < count; ++i) { sum += access(i); }
-    return sum / static_cast<float>(count);
-}
-
-template<typename ContainerAccess>
-auto rollingAverage(std::size_t count, float* out, ContainerAccess access) -> void
-{
-    for (auto i{0U}; i < count; ++i, ++out) { *out = average(i + 1, access); }
-}
-
-auto rollingAverage(std::vector<ta::LevelWindow> const& windows) -> std::vector<float>
-{
-    auto averages = std::vector<float>{};
-    averages.resize(windows.size());
-    rollingAverage(windows.size(), averages.data(), [&windows](std::size_t i) { return windows[i].rms; });
-    return averages;
-}
-
-auto applyBallisticFilter(ta::BufferWithSampleRate const& buf) -> juce::AudioBuffer<float>
-{
-    auto filter = juce::dsp::BallisticsFilter<float>{};
-    filter.setLevelCalculationType(juce::dsp::BallisticsFilter<float>::LevelCalculationType::RMS);
-    filter.setAttackTime(ta::Milliseconds<float>{10'000.0f}.count());
-    filter.setReleaseTime(ta::Milliseconds<float>{10'000.0f}.count());
+    auto filter = juce::dsp::BallisticsFilter<double>{};
+    filter.setLevelCalculationType(juce::dsp::BallisticsFilter<double>::LevelCalculationType::RMS);
+    filter.setAttackTime(env.count());
+    filter.setReleaseTime(env.count());
     filter.prepare({
         buf.sampleRate,
         static_cast<uint32_t>(buf.buffer.getNumChannels()),
         static_cast<uint32_t>(buf.buffer.getNumSamples()),
     });
 
-    auto filtered = juce::AudioBuffer<float>{buf.buffer.getNumChannels(), buf.buffer.getNumSamples()};
-    auto inBlock  = juce::dsp::AudioBlock<float const>{buf.buffer};
-    auto outBlock = juce::dsp::AudioBlock<float>{filtered};
-    filter.process(juce::dsp::ProcessContextNonReplacing<float>{inBlock, outBlock});
-    return filtered;
+    auto filtered = juce::AudioBuffer<double>{buf.buffer.getNumChannels(), buf.buffer.getNumSamples()};
+    auto inBlock  = juce::dsp::AudioBlock<double const>{doubleInput};
+    auto outBlock = juce::dsp::AudioBlock<double>{filtered};
+    filter.process(juce::dsp::ProcessContextNonReplacing<double>{inBlock, outBlock});
+
+    auto floatOutput = juce::AudioBuffer<float>{};
+    floatOutput.makeCopyOf(filtered);
+
+    return floatOutput;
 }
 
 MainComponent::MainComponent()
 {
     addAndMakeVisible(_loadFile);
+
     _loadFile.onClick = [this]
     {
-        auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
-        // auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
-        if (!path.existsAsFile()) { return; }
-        _audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 4.0);
-        if (_audioBuffer.buffer.getNumSamples() == 0) { return; }
-        _rmsWindows = ta::analyseFile(_audioBuffer);
-        _filtered   = applyBallisticFilter(_audioBuffer);
-        repaint();
+        // auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
+        auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
+        loadFile(path);
     };
 
     _formatManager.registerBasicFormats();
@@ -145,26 +105,17 @@ void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
+    juce::ScopedLock lock{_mutex};
+
     g.setColour(juce::Colours::white);
     g.fillRect(_drawArea);
 
     if (_rmsWindows.empty()) { return; }
 
-    auto const peakPath = peakWindowsToPath(_rmsWindows, _drawArea);
-    g.setColour(juce::Colours::red);
-    g.strokePath(peakPath, juce::PathStrokeType(1.0));
+    auto rmsPath = rmsWindowsToPath(_rmsWindows, _drawArea);
 
-    auto const rmsPath = rmsWindowsToPath(_rmsWindows, _drawArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
-
-    auto const rmsAveragePath = rmsAverageToPath(rollingAverage(_rmsWindows), _drawArea);
-    g.setColour(juce::Colours::blue);
-    g.strokePath(rmsAveragePath, juce::PathStrokeType(1.0));
-
-    auto const filteredPath = audioBufferToPath(_filtered, _drawArea);
-    g.setColour(juce::Colours::green);
-    g.strokePath(filteredPath, juce::PathStrokeType(1.0));
 }
 
 void MainComponent::resized()
@@ -172,4 +123,26 @@ void MainComponent::resized()
     auto area = getLocalBounds();
     _loadFile.setBounds(area.removeFromTop(area.proportionOfHeight(0.1f)));
     _drawArea = area;
+}
+
+auto MainComponent::loadFile(juce::File const& file) -> void
+{
+    auto task = [this, path = file]
+    {
+        if (!path.existsAsFile()) { return; }
+
+        auto audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 8.0);
+        if (audioBuffer.buffer.getNumSamples() == 0) { return; }
+        auto rmsWindows = ta::analyseFile(audioBuffer);
+
+        {
+            juce::ScopedLock lock{_mutex};
+            _audioBuffer = std::move(audioBuffer);
+            _rmsWindows  = std::move(rmsWindows);
+        }
+
+        juce::MessageManager::callAsync([this] { repaint(); });
+    };
+
+    _threadPool.addJob(task);
 }

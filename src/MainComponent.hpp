@@ -24,13 +24,17 @@ public:
     auto resized() -> void override;
 
 private:
+    auto loadFile(juce::File const& file) -> void;
+
+    juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
+
+    juce::CriticalSection _mutex;
     juce::AudioFormatManager _formatManager;
     juce::TextButton _loadFile{"Load File"};
     juce::Rectangle<int> _drawArea{};
 
     ta::BufferWithSampleRate _audioBuffer{};
     std::vector<ta::LevelWindow> _rmsWindows;
-    juce::AudioBuffer<float> _filtered;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
