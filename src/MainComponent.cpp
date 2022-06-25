@@ -130,9 +130,9 @@ void MainComponent::paint(juce::Graphics& g)
     {
         auto bin = _rmsBins[i];
         if (bin == 0.0f) { continue; }
-        auto const x = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _drawArea.getWidth();
-        auto const y = _drawArea.getY() + _drawArea.getHeight() * (1.0f - ((float)bin / (float)max));
-        g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, 8.0f, 8.0f).withCentre(juce::Point<float>(x, y)));
+        auto const height = _drawArea.getHeight() * ((float)bin / (float)max);
+        auto const x      = static_cast<float>(_rmsBins.size() - i) / _rmsBins.size() * _drawArea.getWidth();
+        g.fillRect(juce::Rectangle<float>(x, 0, 8.0f, height).withBottomY(_drawArea.getBottom()));
 
         auto textArea = juce::Rectangle<int>((int)x, 0, 40, 40).withBottomY(_drawArea.getBottom());
         g.drawText(juce::String(i), textArea, juce::Justification::centred);
@@ -183,11 +183,14 @@ auto MainComponent::analyseAudio() -> void
         auto rmsWindows = ta::analyseFile(audioBuffer, windowSize);
 
         auto rmsBins = std::vector<int>{};
+        rmsBins.resize(81U);
         for (auto const& window : rmsWindows)
         {
-            auto dB    = std::abs(juce::Decibels::gainToDecibels(window.rms));
-            auto index = static_cast<std::size_t>(std::round(dB));
-            if (index >= rmsBins.size()) { rmsBins.resize(index + 1, 0); }
+            auto dB = juce::Decibels::gainToDecibels(window.rms);
+            if (dB <= -80.0f) { continue; }
+            if (dB > 0.0f) { continue; }
+
+            auto index = static_cast<std::size_t>(std::round(std::abs(dB)));
             rmsBins[index] += 1;
         }
 
