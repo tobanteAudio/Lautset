@@ -11,6 +11,7 @@
 struct MainComponent final
     : juce::Component
     , juce::ChangeListener
+    , juce::AsyncUpdater
 {
     MainComponent();
 
@@ -19,6 +20,7 @@ struct MainComponent final
 
 private:
     auto changeListenerCallback(juce::ChangeBroadcaster* source) -> void override;
+    auto handleAsyncUpdate() -> void override;
     auto loadFile(juce::File const& file) -> void;
     auto analyseAudio() -> void;
 

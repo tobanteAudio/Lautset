@@ -55,9 +55,11 @@ MainComponent::MainComponent()
 
     _rmsWindowLength.setRange(juce::Range<double>{1'000.0, 45'000.0}, 100.0);
     _rmsWindowLength.setValue(5'000.0);
+    _rmsWindowLength.onDragEnd = [this] { triggerAsyncUpdate(); };
 
     _rmsThreshold.setRange(juce::Range<double>{-30.0, 0.0}, 1.0);
     _rmsThreshold.setValue(-18.0);
+    _rmsThreshold.onDragEnd = [this] { triggerAsyncUpdate(); };
 
     _loadFile.onClick = [this]
     {
@@ -69,7 +71,7 @@ MainComponent::MainComponent()
     _analyze.onClick = [this] { analyseAudio(); };
 
     _formatManager.registerBasicFormats();
-    setSize(600, 400);
+    setSize(1280, 720);
 }
 
 void MainComponent::paint(juce::Graphics& g)
@@ -140,6 +142,7 @@ auto MainComponent::changeListenerCallback(juce::ChangeBroadcaster* source) -> v
 {
     if (source == &_thumbnail) { repaint(); }
 }
+auto MainComponent::handleAsyncUpdate() -> void { analyseAudio(); }
 
 auto MainComponent::loadFile(juce::File const& file) -> void
 {
@@ -168,6 +171,8 @@ auto MainComponent::loadFile(juce::File const& file) -> void
 
 auto MainComponent::analyseAudio() -> void
 {
+    if (_audioBuffer == nullptr) { return; }
+
     auto windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()};
     auto task       = [this, windowSize, buffer = _audioBuffer]
     {
