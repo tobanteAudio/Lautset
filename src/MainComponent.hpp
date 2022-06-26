@@ -8,6 +8,9 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+namespace ta
+{
+
 struct MainComponent final
     : juce::Component
     , juce::ChangeListener
@@ -28,8 +31,8 @@ private:
     juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
     juce::AudioFormatManager _formatManager;
 
-    std::shared_ptr<ta::BufferWithSampleRate const> _audioBuffer{};
-    ta::LoudnessAnalysis::Result _analysis{};
+    std::shared_ptr<BufferWithSampleRate const> _audioBuffer{};
+    LoudnessAnalysis::Result _analysis{};
 
     juce::AudioThumbnailCache _thumbnailCache{1};
     juce::AudioThumbnail _thumbnail{1024, _formatManager, _thumbnailCache};
@@ -43,3 +46,5 @@ private:
 
     std::unique_ptr<juce::FileChooser> _fileChooser{};
 };
+
+}  // namespace ta

@@ -42,8 +42,6 @@ auto rmsWindowsToPath(std::vector<LevelWindow> const& windows, juce::Rectangle<f
 }
 
 }  // namespace
-}  // namespace ta
-
 MainComponent::MainComponent()
 {
     _formatManager.registerBasicFormats();
@@ -93,7 +91,7 @@ void MainComponent::paint(juce::Graphics& g)
         g.fillRect(area);
     }
 
-    auto rmsPath = ta::rmsWindowsToPath(_analysis.rmsWindows, _rmsWindowsArea);
+    auto rmsPath = rmsWindowsToPath(_analysis.rmsWindows, _rmsWindowsArea);
     g.setColour(juce::Colours::black);
     g.strokePath(rmsPath, juce::PathStrokeType(1.0));
 
@@ -143,10 +141,10 @@ auto MainComponent::loadFile(juce::File const& file) -> void
     {
         if (!path.existsAsFile()) { return; }
 
-        auto audioBuffer = ta::resampleAudioBuffer(ta::loadAudioFileToBuffer(path, 0), 44'100.0 / 8.0);
+        auto audioBuffer = resampleAudioBuffer(loadAudioFileToBuffer(path, 0), 44'100.0 / 8.0);
         if (audioBuffer.buffer.getNumSamples() == 0) { return; }
 
-        auto ptr = std::make_shared<ta::BufferWithSampleRate const>(std::move(audioBuffer));
+        auto ptr = std::make_shared<BufferWithSampleRate const>(std::move(audioBuffer));
 
         juce::MessageManager::callAsync(
             [this, ptr]
@@ -163,10 +161,10 @@ auto MainComponent::analyseAudio() -> void
 {
     if (_audioBuffer == nullptr) { return; }
 
-    auto windowSize = ta::Milliseconds<float>{_rmsWindowLength.getValue()};
+    auto windowSize = Milliseconds<float>{_rmsWindowLength.getValue()};
     auto task       = [this, windowSize, buffer = _audioBuffer]
     {
-        auto analyzer = ta::LoudnessAnalysis{{buffer, windowSize}};
+        auto analyzer = LoudnessAnalysis{{buffer, windowSize}};
         auto result   = analyzer();
 
         juce::MessageManager::callAsync(
@@ -196,3 +194,5 @@ auto MainComponent::launchFileOpenDialog() -> void
     _fileChooser = std::make_unique<juce::FileChooser>(msg, dir, _formatManager.getWildcardForAllFormats());
     _fileChooser->launchAsync(fileFlags, load);
 }
+
+}  // namespace ta
