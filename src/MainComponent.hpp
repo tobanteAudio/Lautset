@@ -23,6 +23,7 @@ private:
     auto handleAsyncUpdate() -> void override;
     auto loadFile(juce::File const& file) -> void;
     auto analyseAudio() -> void;
+    auto launchFileOpenDialog() -> void;
 
     juce::ThreadPool _threadPool{juce::SystemStats::getNumCpus()};
     juce::AudioFormatManager _formatManager;
@@ -34,10 +35,11 @@ private:
     juce::AudioThumbnail _thumbnail{1024, _formatManager, _thumbnailCache};
 
     juce::TextButton _loadFile{"Load File"};
-    juce::TextButton _analyze{"Analyze"};
     juce::Slider _rmsWindowLength{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
     juce::Slider _rmsThreshold{juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight};
     juce::Rectangle<float> _rmsWindowsArea{};
     juce::Rectangle<float> _rmsBinsArea{};
     juce::Rectangle<float> _thumbnailArea{};
+
+    std::unique_ptr<juce::FileChooser> _fileChooser{};
 };

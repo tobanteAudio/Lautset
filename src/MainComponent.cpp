@@ -46,12 +46,11 @@ auto rmsWindowsToPath(std::vector<LevelWindow> const& windows, juce::Rectangle<f
 
 MainComponent::MainComponent()
 {
+    _formatManager.registerBasicFormats();
+
     addAndMakeVisible(_loadFile);
-    addAndMakeVisible(_analyze);
     addAndMakeVisible(_rmsWindowLength);
     addAndMakeVisible(_rmsThreshold);
-
-    _thumbnail.addChangeListener(this);
 
     _rmsWindowLength.setRange(juce::Range<double>{1'000.0, 45'000.0}, 100.0);
     _rmsWindowLength.setValue(5'000.0);
@@ -61,16 +60,9 @@ MainComponent::MainComponent()
     _rmsThreshold.setValue(-18.0);
     _rmsThreshold.onDragEnd = [this] { triggerAsyncUpdate(); };
 
-    _loadFile.onClick = [this]
-    {
-        auto path = juce::File{"/home/tobante/Downloads/3 deck action volume adjust mp3.mp3"};
-        // auto path = juce::File{"/home/tobante/Music/Loops/Drums.wav"};
-        loadFile(path);
-    };
+    _loadFile.onClick = [this] { launchFileOpenDialog(); };
+    _thumbnail.addChangeListener(this);
 
-    _analyze.onClick = [this] { analyseAudio(); };
-
-    _formatManager.registerBasicFormats();
     setSize(1280, 720);
 }
 
@@ -128,7 +120,6 @@ void MainComponent::resized()
     auto area                = getLocalBounds();
     auto const controlHeight = area.proportionOfHeight(0.06F);
     _loadFile.setBounds(area.removeFromTop(controlHeight));
-    _analyze.setBounds(area.removeFromTop(controlHeight));
     _rmsWindowLength.setBounds(area.removeFromBottom(controlHeight));
     _rmsThreshold.setBounds(area.removeFromBottom(controlHeight));
 
@@ -161,8 +152,7 @@ auto MainComponent::loadFile(juce::File const& file) -> void
             [this, ptr]
             {
                 _audioBuffer = ptr;
-                analyseAudio();
-                repaint();
+                triggerAsyncUpdate();
             });
     };
 
@@ -188,4 +178,21 @@ auto MainComponent::analyseAudio() -> void
     };
 
     _threadPool.addJob(task);
+}
+
+auto MainComponent::launchFileOpenDialog() -> void
+{
+    auto const* msg      = "Please select the audio file you want to load...";
+    auto const dir       = juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+    auto const fileFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+
+    auto load = [this](auto const& chooser)
+    {
+        auto file = chooser.getResult();
+        if (!file.existsAsFile()) { return; }
+        loadFile(file);
+    };
+
+    _fileChooser = std::make_unique<juce::FileChooser>(msg, dir, _formatManager.getWildcardForAllFormats());
+    _fileChooser->launchAsync(fileFlags, load);
 }

@@ -3,6 +3,10 @@ project(Lautset VERSION 0.1.0)
 
 option(LAUTSET_ENABLE_LTO       "Build with LTO enabled"                OFF)
 option(LAUTSET_ENABLE_WERROR    "Build with warnings as errors enabled" OFF)
+option(LAUTSET_ENABLE_ASAN      "Build with ASAN enabled"               OFF)
+option(LAUTSET_ENABLE_UBSAN     "Build with UBSAN enabled"              OFF)
+option(LAUTSET_ENABLE_MSAN      "Build with MSAN enabled"               OFF)
+option(LAUTSET_ENABLE_TSAN      "Build with TSAN enabled"               OFF)
 
 # Caches build artifacts for faster builds
 find_program(CCACHE ccache)
@@ -27,6 +31,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(compiler_warnings)
+include(compiler_options)
 
 add_subdirectory(3rd_party/JUCE EXCLUDE_FROM_ALL)
 
@@ -73,6 +78,7 @@ target_link_libraries(${PROJECT_NAME}
         juce::juce_gui_extra
     PUBLIC
         lautset::compiler_warnings
+        lautset::compiler_options
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
         $<$<BOOL:${LAUTSET_ENABLE_LTO}>:juce::juce_recommended_lto_flags>
